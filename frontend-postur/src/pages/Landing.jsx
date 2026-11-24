@@ -56,7 +56,7 @@ const FEATURES = [
 
 const STATES = [
   ["Postur Baik", "Duduk tegak, tidak ada tindakan"],
-  ["Menganalisis AI...", "Posisi sedang dibaca"],
+  ["Menganalisis...", "Posisi sedang dibaca"],
   ["Postur Buruk!", "Hitung mundur dimulai"],
 ];
 
@@ -109,34 +109,56 @@ const FAQ = [
 // ilustrasi posisi kamera dan duduk yang ideal (tampak samping), tidak diubah
 const Diagram = () => (
   <div className="lp-diagram">
-    <svg viewBox="0 0 270 180" role="img" aria-label="Kamera setinggi mata, telinga sejajar bahu, jarak sekitar satu lengan">
+    <svg viewBox="0 0 270 190" role="img" aria-label="Kamera setinggi mata, telinga sejajar bahu, jarak sekitar satu lengan">
+      {/* lantai dan meja */}
       <rect x="6" y="150" width="258" height="5" rx="2.5" fill="var(--line)" />
-      <rect x="150" y="116" width="112" height="6" rx="3" fill="var(--brand)" opacity=".25" />
-      <line x1="236" y1="122" x2="236" y2="150" stroke="var(--brand)" strokeWidth="5" opacity=".25" />
-      {/* laptop */}
-      <rect x="156" y="108" width="52" height="8" rx="3" fill="var(--brand)" />
-      <line x1="160" y1="108" x2="152" y2="58" stroke="var(--brand)" strokeWidth="7" strokeLinecap="round" />
-      <circle cx="152" cy="58" r="3.5" fill="var(--accent)" />
-      {/* orang */}
-      <rect x="50" y="146" width="44" height="5" rx="2.5" fill="var(--brand)" opacity=".35" />
+      <rect x="132" y="116" width="130" height="6" rx="3" fill="var(--brand)" opacity=".25" />
+      <line x1="252" y1="122" x2="252" y2="150" stroke="var(--brand)" strokeWidth="5" opacity=".25" />
+
+      {/* laptop: engsel di sisi kanan, layar menghadap ke orang */}
+      <rect x="140" y="108" width="54" height="8" rx="3" fill="var(--brand)" />
+      <line x1="190" y1="110" x2="198" y2="58" stroke="var(--brand)" strokeWidth="7" strokeLinecap="round" />
+      <circle cx="198" cy="58" r="3.5" fill="var(--accent)" />
+
+      {/* kursi: sandaran, dudukan, tiang, kaki roda */}
+      <g fill="var(--brand)" stroke="var(--brand)" opacity=".4">
+        <rect x="52" y="84" width="7" height="55" rx="3.5" stroke="none" />
+        <rect x="52" y="132" width="64" height="7" rx="3.5" stroke="none" />
+        <line x1="84" y1="139" x2="84" y2="146" strokeWidth="5" />
+        <line x1="62" y1="146" x2="106" y2="146" strokeWidth="5" strokeLinecap="round" />
+        <circle cx="62" cy="148.5" r="3" stroke="none" />
+        <circle cx="106" cy="148.5" r="3" stroke="none" />
+      </g>
+
+      {/* orang menghadap laptop */}
       <rect x="60" y="78" width="22" height="48" rx="11" fill="var(--brand)" />
       <line x1="70" y1="126" x2="110" y2="126" stroke="var(--brand)" strokeWidth="12" strokeLinecap="round" />
-      <line x1="110" y1="126" x2="110" y2="148" stroke="var(--brand)" strokeWidth="10" strokeLinecap="round" />
-      <path d="M71 90 L100 106 L136 112" fill="none" stroke="var(--brand)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="110" y1="126" x2="110" y2="146" stroke="var(--brand)" strokeWidth="10" strokeLinecap="round" />
+      <line x1="108" y1="146.5" x2="124" y2="146.5" stroke="var(--brand)" strokeWidth="7" strokeLinecap="round" />
+      <path d="M71 90 L100 106 L136 111" fill="none" stroke="var(--brand)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="71" cy="58" r="15" fill="var(--good-ink)" />
       <circle cx="67" cy="60" r="3.2" fill="var(--accent-light)" />
       <circle cx="71" cy="87" r="3.2" fill="var(--accent-light)" />
+
       {/* garis bantu */}
       <line x1="67" y1="30" x2="67" y2="132" stroke="var(--accent)" strokeWidth="1.8" strokeDasharray="4 4" />
-      <line x1="71" y1="56" x2="150" y2="56" stroke="var(--accent)" strokeWidth="1.8" strokeDasharray="4 4" />
-      <line x1="84" y1="166" x2="152" y2="166" stroke="var(--ink-soft)" strokeWidth="1.5" />
-      <line x1="84" y1="162" x2="84" y2="170" stroke="var(--ink-soft)" strokeWidth="1.5" />
-      <line x1="152" y1="162" x2="152" y2="170" stroke="var(--ink-soft)" strokeWidth="1.5" />
+      <line x1="71" y1="58" x2="196" y2="58" stroke="var(--accent)" strokeWidth="1.8" strokeDasharray="4 4" />
+      <line x1="84" y1="168" x2="190" y2="168" stroke="var(--ink-soft)" strokeWidth="1.5" />
+      <line x1="84" y1="164" x2="84" y2="172" stroke="var(--ink-soft)" strokeWidth="1.5" />
+      <line x1="190" y1="164" x2="190" y2="172" stroke="var(--ink-soft)" strokeWidth="1.5" />
       <text x="6" y="22">Telinga sejajar bahu</text>
-      <text x="92" y="48">Kamera setinggi mata</text>
-      <text x="92" y="180" fontSize="9">Sejarak satu lengan</text>
+      <text x="96" y="49">Kamera setinggi mata</text>
+      <text x="104" y="184">Sejarak satu lengan</text>
     </svg>
   </div>
+);
+
+// sisi miring tab folder; sisi kanan adalah cermin sisi kiri lewat CSS
+const Cap = ({ right }) => (
+  <svg className={`lp-cap ${right ? "r" : ""}`} viewBox="0 0 64 56" preserveAspectRatio="none" aria-hidden="true">
+    <path className="f" d="M0 56 C36 56 28 0 64 0 V56 Z" />
+    <path className="s" d="M0 55.5 C36 55.5 28 0.5 64 0.5" />
+  </svg>
 );
 
 const PipMock = () => (
@@ -329,9 +351,16 @@ export default function Landing({ onLogin, onRegister }) {
             </div>
             <div className="lp-tabs" role="tablist">
               {GUIDE.map((g, i) => (
-                <button key={g.label} role="tab" aria-selected={tab === i} className={`lp-tab ${tab === i ? "active" : ""}`} onClick={() => setTab(i)}>
-                  {g.label}
-                  <small>{g.sub}</small>
+                <button
+                  key={g.label}
+                  role="tab"
+                  aria-selected={tab === i}
+                  className={`lp-tab ${tab === i ? "active" : ""} ${i === 0 ? "first" : ""} ${i === GUIDE.length - 1 ? "last" : ""}`}
+                  onClick={() => setTab(i)}
+                >
+                  {i > 0 && <Cap />}
+                  <span className="lp-tab-body"><b>{g.label}</b><small>{g.sub}</small></span>
+                  {i < GUIDE.length - 1 && <Cap right />}
                 </button>
               ))}
             </div>
@@ -369,12 +398,46 @@ export default function Landing({ onLogin, onRegister }) {
 
       <footer className="lp-foot">
         <div className="lp-wrap">
-          <span>UnSlouch, Kelompok 11</span>
-          <nav>
-            {NAV.map(([id, label]) => (
-              <button key={id} onClick={() => go(id)}>{label}</button>
-            ))}
-          </nav>
+          <div className="lp-foot-grid">
+            <div className="lp-foot-brand">
+              <button className="lp-brand" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+                <span className="brand-mark"><Logo /></span>
+                UnSlouch
+              </button>
+              <p>
+                Pemantau postur duduk berbasis webcam. Membantu Anda menyadari kebiasaan membungkuk
+                sebelum menimbulkan keluhan.
+              </p>
+            </div>
+
+            <div>
+              <h4>Navigasi</h4>
+              <ul>
+                {NAV.map(([id, label]) => (
+                  <li key={id}><button onClick={() => go(id)}>{label}</button></li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h4>Akun</h4>
+              <ul>
+                <li><button onClick={onLogin}>Masuk</button></li>
+                <li><button onClick={onRegister}>Daftar</button></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4>Privasi dan penggunaan</h4>
+              <ul>
+                <li>Gambar webcam tidak disimpan.</li>
+                <li>Berjalan pada CPU tanpa GPU.</li>
+                <li>Alat bantu pengingat postur, bukan alat diagnosis medis.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="lp-foot-bar">© 2026 UnSlouch. Dikembangkan oleh Kelompok 11.</div>
         </div>
       </footer>
     </div>

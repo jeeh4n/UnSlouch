@@ -2328,49 +2328,105 @@ h2 {
 
 /* ---------- panduan ---------- */
 .lp-tabs {
+  --cap: 64px;
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
+  align-items: end;
 }
 .lp-tab {
-  padding: 14px 18px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--card);
-  text-align: left;
-  font-weight: 700;
-  color: var(--ink);
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  --fill: var(--brand-tint);
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  height: 62px;
+  padding: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  transition: color 0.2s;
 }
-.lp-tab small {
+.lp-tab:hover:not(.active) {
+  --fill: #e3e8f3;
+  color: var(--brand);
+}
+/* tab aktif: lebih tinggi, warna sama dengan panel, menutup garis atas panel */
+.lp-tab.active {
+  --fill: var(--card);
+  z-index: 3;
+  height: 78px;
+  margin-bottom: -1px;
+  color: var(--brand);
+}
+.lp-cap {
+  flex: 0 0 var(--cap);
+  width: var(--cap);
+  height: 100%;
   display: block;
+}
+.lp-cap.r {
+  transform: scaleX(-1);
+}
+.lp-cap .f {
+  fill: var(--fill);
+  transition: fill 0.2s;
+}
+.lp-cap .s {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.lp-tab-body {
+  flex: 1;
+  min-width: 0;
+  margin: 0 -1px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid var(--line);
+  background: var(--fill);
+  text-align: center;
+  transition: background 0.2s;
+}
+.lp-tab-body b {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.lp-tab-body small {
   margin-top: 2px;
-  font-size: 12px;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--ink-soft);
 }
-.lp-tab:hover {
-  border-color: var(--brand);
-  color: var(--brand);
+/* sisi paling kiri dan kanan: lurus, hanya sudut atasnya yang membulat */
+.lp-tab.first .lp-tab-body {
+  margin-left: 0;
+  border-left: 1px solid var(--line);
+  border-top-left-radius: 18px;
 }
-.lp-tab.active {
-  border-color: var(--brand);
-  background: var(--brand);
-  color: #fff;
+.lp-tab.last .lp-tab-body {
+  margin-right: 0;
+  border-right: 1px solid var(--line);
+  border-top-right-radius: 18px;
 }
-.lp-tab.active small {
-  color: rgba(255, 255, 255, 0.75);
-}
+/* sudut atas panel tertutup tab kiri dan kanan, jadi dibuat lurus */
 .lp-panel {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1.1fr 1fr;
   gap: 36px;
   padding: 32px;
   border: 1px solid var(--line);
-  border-radius: var(--r-lg);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
   background: var(--card);
   box-shadow: var(--shadow-sm);
+}
+/* hanya isi panel yang beranimasi, supaya sambungan dengan tab tetap rapi */
+.lp-panel > * {
   animation: lp-swap 0.35s ease both;
 }
 @keyframes lp-swap {
@@ -2572,28 +2628,60 @@ h2 {
 }
 
 .lp-foot {
-  padding: 26px 0 40px;
-  border-top: 1px solid var(--line);
+  padding: 56px 0 28px;
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
   font-size: 14px;
-  color: var(--ink-soft);
+  color: rgba(255, 255, 255, 0.74);
 }
-.lp-foot .lp-wrap {
+.lp-foot-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1.3fr;
+  gap: 40px;
+  padding-bottom: 40px;
+}
+.lp-foot .lp-brand {
+  margin-right: 0;
+  color: #fff;
+}
+.lp-foot .brand-mark {
+  background: #fff;
+}
+.lp-foot-brand p {
+  max-width: 34ch;
+  margin-top: 16px;
+  line-height: 1.7;
+}
+.lp-foot h4 {
+  margin-bottom: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+.lp-foot ul {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
 }
-.lp-foot nav {
-  display: flex;
-  gap: 18px;
+.lp-foot li {
+  line-height: 1.5;
 }
-.lp-foot nav button {
+.lp-foot li button {
+  padding: 0;
   background: transparent;
   font-size: 14px;
-  color: var(--ink-soft);
+  color: rgba(255, 255, 255, 0.74);
+  transition: color 0.15s;
 }
-.lp-foot nav button:hover { color: var(--brand); }
+.lp-foot li button:hover {
+  color: var(--accent-light);
+}
+.lp-foot-bar {
+  padding-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
 
 /* tombol kembali di halaman Masuk / Daftar */
 .auth-back {
@@ -2614,6 +2702,11 @@ h2 {
   .lp-hero .lp-wrap { grid-template-columns: 1fr; gap: 56px; }
   .lp-hero h1 { max-width: 20ch; }
   .lp-feat { grid-template-columns: 1fr; gap: 32px; }
+  .lp-tabs { --cap: 36px; }
+  .lp-tab { height: 50px; }
+  .lp-tab.active { height: 60px; }
+  .lp-tab-body small { display: none; }
+  .lp-foot-grid { grid-template-columns: 1fr 1fr; }
   .lp-panel { grid-template-columns: 1fr; }
 }
 @media (max-width: 700px) {
@@ -2625,10 +2718,12 @@ h2 {
   .lp-steps { grid-template-columns: 1fr; gap: 36px; }
   .lp-steps::before,
   .lp-steps::after { display: none; }
-  .lp-tabs { grid-template-columns: 1fr; }
+  .lp-tabs { --cap: 20px; }
+  .lp-tab-body b { font-size: 0.9rem; }
   .lp-chip.stretch { left: 0; }
   .lp-chip.timer { right: 0; }
   .lp-panel { padding: 22px; }
+  .lp-foot-grid { grid-template-columns: 1fr; gap: 28px; }
 }
 
 /* hormati pengguna yang mematikan animasi: tampilkan satu keadaan statis (postur baik) */

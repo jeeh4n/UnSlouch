@@ -122,7 +122,7 @@ export default function Monitoring({ camera, settings, posture, stretchAlert = f
     ? "Postur Baik"
     : posture === "bad"
     ? "Postur Buruk!"
-    : "Menganalisis AI...";
+    : "Menganalisis...";
 
   let statusColor = "var(--ink)";
   let statusBg = "var(--brand-tint)";
