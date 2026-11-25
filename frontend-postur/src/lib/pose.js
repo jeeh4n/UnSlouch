@@ -1,30 +1,41 @@
-// Variabel untuk membatasi frekuensi pengiriman ke API (throttle)
+// Variabel untuk membatasi frekuensi pengiriman ke API (throttle) & mencegah antrean request
 let lastAnalyzeTime = 0;
-const ANALYZE_INTERVAL_MS = 300; 
+let isAnalyzing = false;
+const ANALYZE_INTERVAL_MS = 150;
+const CAPTURE_MAX_WIDTH = 320;
 
 export async function detectPose(video, timestamp, canvas, token) {
-  if (!token || !video || video.readyState < 2) return null;
-
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  
-  ctx.save();
-  ctx.scale(-1, 1); 
-  ctx.translate(-canvas.width, 0);
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  ctx.restore();
+  if (!token || !video || video.readyState < 2 || !canvas) return null;
 
   const now = performance.now();
-  if (now - lastAnalyzeTime < ANALYZE_INTERVAL_MS) {
-    return undefined; 
+  if (isAnalyzing || now - lastAnalyzeTime < ANALYZE_INTERVAL_MS) {
+    return undefined;
   }
 
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!vw || !vh) return undefined;
+
+  isAnalyzing = true;
+  lastAnalyzeTime = now;
+
   try {
-    lastAnalyzeTime = performance.now(); 
+    const targetW = Math.min(vw, CAPTURE_MAX_WIDTH);
+    const targetH = Math.round(vh * (targetW / vw));
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+    }
+
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.translate(-targetW, 0);
+    ctx.drawImage(video, 0, 0, targetW, targetH);
+    ctx.restore();
 
     const imageBlob = await new Promise((resolve) => {
-      canvas.toBlob(resolve, "image/jpeg", 0.8);
+      canvas.toBlob(resolve, "image/jpeg", 0.7);
     });
 
     if (!imageBlob) return null;
@@ -39,24 +50,23 @@ export async function detectPose(video, timestamp, canvas, token) {
     });
 
     const data = await res.json();
-    
-    // CEK CONSOLE BROWSER (F12) JIKA PENASARAN HASILNYA
     console.log("Respon AI:", data);
 
     if (data.status === "sukses") {
       const isBad = data.hasil.target_prediksi === 1;
-      return { 
-        bad: isBad, 
+      return {
+        bad: isBad,
         detail: data.hasil,
-        landmarks: data.hasil.titik_tubuh 
+        landmarks: data.hasil.titik_tubuh,
       };
     } else {
-      // Jika gagal (Misal: Tubuh tidak terdeteksi / Bahu terpotong)
       return { error: data.pesan || "Gagal mendeteksi postur" };
     }
   } catch (err) {
     console.error("Fetch Error:", err);
     return { error: "Koneksi backend terputus" };
+  } finally {
+    isAnalyzing = false;
   }
 }
 

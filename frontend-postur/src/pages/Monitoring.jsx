@@ -65,7 +65,7 @@ const sideLabelStyle = {
   textAlign: "left",
 };
 
-export default function Monitoring({ camera, settings, posture, stretchAlert = false }) {
+export default function Monitoring({ camera, settings, posture, landmarks = null, stretchAlert = false }) {
   const [sessionWarnings, setSessionWarnings] = useState(0);
 
   // --- Rekap sesi: muncul sebagai pop-up saat kamera dimatikan; angka di halaman dibekukan sampai pop-up ditutup ---
@@ -268,6 +268,7 @@ export default function Monitoring({ camera, settings, posture, stretchAlert = f
             <CameraStage
               camera={camera}
               posture={posture}
+              landmarks={landmarks}
               dwell={settings.dwell}
               stretchAlert={stretchAlert}
               title="Kamera belum aktif"

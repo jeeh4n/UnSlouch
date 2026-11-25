@@ -18,6 +18,7 @@ import math
 import sqlite3
 import hashlib
 import secrets
+import threading
 import traceback
 from datetime import datetime
 import cv2
@@ -26,6 +27,7 @@ import mediapipe as mp
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -119,8 +121,29 @@ ENGINEERED_COLS = [
     "ergonomic_deviation_score"
 ]
 
+if not hasattr(mp, "solutions"):
+    raise RuntimeError(
+        "\n===================================================================\n"
+        "[ERROR] Modul 'mediapipe.solutions' tidak ditemukan!\n"
+        "Ini terjadi karena Anda menjalankan dengan Python 3.13 (global).\n"
+        "Silakan jalankan backend menggunakan virtual environment (Python 3.10):\n\n"
+        "   cd backend-postur\n"
+        "   .\\venv\\Scripts\\activate\n"
+        "   uvicorn main:app --reload\n\n"
+        "Atau jalankan langsung uvicorn dari venv:\n"
+        "   .\\venv\\Scripts\\uvicorn.exe main:app --reload\n"
+        "===================================================================\n"
+    )
+
 mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
+pose = mp_pose.Pose(
+    static_image_mode=False,
+    model_complexity=0,
+    smooth_landmarks=True,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5,
+)
+pose_lock = threading.Lock()
 
 # ==========================================
 # 2. SCHEMA & HELPER AUTENTIKASI
@@ -210,6 +233,28 @@ def get_me(current_user: str = Depends(get_current_user)):
 # ==========================================
 # 4. EKSTRAKSI FITUR & ANALISIS POSTUR
 # ==========================================
+def preprocess_image(img_bgr, max_dim: int = 640):
+    if img_bgr is None or img_bgr.size == 0:
+        return None
+
+    img = img_bgr
+    if img.dtype != np.uint8:
+        img = np.clip(img, 0, 255).astype(np.uint8)
+
+    if img.ndim == 2:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    elif img.ndim == 3 and img.shape[2] == 4:
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+    elif img.ndim != 3 or img.shape[2] != 3:
+        return None
+
+    h, w = img.shape[:2]
+    if max(h, w) > max_dim:
+        scale = max_dim / float(max(h, w))
+        img = cv2.resize(img, (int(round(w * scale)), int(round(h * scale))), interpolation=cv2.INTER_AREA)
+
+    return np.ascontiguousarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+
 def extract_5_features(pose_landmarks, img_w: int, img_h: int):
     lm = pose_landmarks.landmark
     vis_thresh = 0.45
@@ -260,81 +305,88 @@ def extract_5_features(pose_landmarks, img_w: int, img_h: int):
 
 def build_16_features(base_values: list) -> pd.DataFrame:
     df_in = pd.DataFrame([base_values], columns=BASE_FEATURES).copy()
-    d_sh, th_sh, th_hd, th_nc, r_vert = df_in["D_shoulder"], df_in["theta_shoulder"], df_in["theta_head"], df_in["theta_neck_chest"], df_in["R_vertical"]
-    r_vert_safe = np.maximum(r_vert, 0.05)
+    d_sh = df_in["D_shoulder"]
+    th_sh = df_in["theta_shoulder"]
+    th_hd = df_in["theta_head"]
+    th_nc = df_in["theta_neck_chest"]
+    r_vert = df_in["R_vertical"]
+    r_vert_safe = np.maximum(np.abs(r_vert), 0.05)
 
     df_in["abs_theta_shoulder"] = np.abs(th_sh)
     df_in["abs_theta_head"] = np.abs(th_hd)
     df_in["head_shoulder_angle_diff"] = np.abs(th_hd - th_sh)
-    df_in["head_shoulder_same_dir"] = np.sign(th_sh) * np.sign(th_hd) * np.sqrt(np.abs(th_sh) * np.abs(th_hd))
-    df_in["lateral_instability_energy"] = th_sh**2 + th_hd**2
+    df_in["head_shoulder_same_dir"] = np.sign(th_hd) * np.sign(th_sh) * np.sqrt(np.abs(th_hd * th_sh))
+    df_in["lateral_instability_energy"] = (th_sh ** 2) + (th_hd ** 2)
     df_in["slouch_severity_ratio"] = th_nc / r_vert_safe
     df_in["neck_compression_product"] = th_nc * (1.0 - r_vert)
-    half_apex_rad = np.radians(np.clip(th_nc, 0.05, 170.0) / 2.0)
-    df_in["implied_ear_to_shoulder_span"] = 2.0 * (r_vert_safe + 0.5) * np.tan(half_apex_rad)
-    df_in["apparent_neck_height_norm"] = d_sh * r_vert
+    half_apex_rad = np.radians(np.clip(th_nc, 1.0, 170.0) / 2.0)
+    df_in["implied_ear_to_shoulder_span"] = 2.0 * (r_vert + 0.50) * np.tan(half_apex_rad)
+    df_in["apparent_neck_height_norm"] = r_vert * d_sh
     df_in["foreshortening_index"] = d_sh / r_vert_safe
 
     z_deviations = np.zeros(len(df_in))
     for col in BASE_FEATURES:
-        z_col = np.abs(df_in[col] - CLASS0_MEDIANS[col]) / CLASS0_IQR[col]
-        z_deviations += z_col
-    df_in["ergonomic_deviation_score"] = z_deviations
+        z_col = (df_in[col] - CLASS0_MEDIANS[col]) / CLASS0_IQR[col]
+        z_deviations += z_col ** 2
+    df_in["ergonomic_deviation_score"] = np.sqrt(z_deviations)
 
     return df_in[ENGINEERED_COLS]
+
+def _run_posture_inference(contents: bytes, current_user: str):
+    nparr = np.frombuffer(contents, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    img_rgb = preprocess_image(img, max_dim=640)
+    if img_rgb is None:
+        raise HTTPException(status_code=400, detail="Gambar tidak valid.")
+
+    img_h, img_w = img_rgb.shape[:2]
+    with pose_lock:
+        results = pose.process(img_rgb)
+
+    if not results.pose_landmarks:
+        return {"status": "gagal", "pesan": "Tubuh manusia tidak terdeteksi."}
+
+    fitur_5 = extract_5_features(results.pose_landmarks, img_w, img_h)
+    if fitur_5 is None:
+        return {"status": "gagal", "pesan": "Titik bahu/telinga tidak jelas."}
+
+    lm = results.pose_landmarks.landmark
+    titik_tubuh = {
+        "nose": {"x": lm[0].x, "y": lm[0].y},
+        "left_ear": {"x": lm[7].x, "y": lm[7].y},
+        "right_ear": {"x": lm[8].x, "y": lm[8].y},
+        "left_shoulder": {"x": lm[11].x, "y": lm[11].y},
+        "right_shoulder": {"x": lm[12].x, "y": lm[12].y},
+    }
+
+    df_16 = build_16_features(fitur_5)
+    X_imputed = imputer_step.transform(df_16)
+    X_scaled = scaler_step.transform(X_imputed)
+
+    prob_buruk = float(clf_step.predict_proba(X_scaled)[0][1])
+    decision_threshold = float(os.getenv("POSTURE_THRESHOLD", CUSTOM_THRESHOLD))
+    angka_hasil = 1 if prob_buruk >= decision_threshold else 0
+    postur_akhir = "Duduk Benar / Tegak" if angka_hasil == 0 else "Duduk Salah / Bungkuk"
+
+    return {
+        "status": "sukses",
+        "email": current_user,
+        "hasil": {
+            "target_prediksi": angka_hasil,
+            "analisis_AI": postur_akhir,
+            "probabilitas": round(prob_buruk, 4),
+            "fitur": dict(zip(BASE_FEATURES, fitur_5)),
+            "titik_tubuh": titik_tubuh,
+        },
+    }
 
 @app.post("/analyze", tags=["Analisis Postur"])
 async def analyze_posture(file: UploadFile = File(...), current_user: str = Depends(get_current_user)):
     try:
         contents = await file.read()
-        nparr = np.frombuffer(contents, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None: raise HTTPException(status_code=400, detail="Gambar tidak valid.")
-
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img_h, img_w = img_rgb.shape[:2]
-
-        results = pose.process(img_rgb)
-        if not results.pose_landmarks:
-            return {"status": "gagal", "pesan": "Tubuh manusia tidak terdeteksi."}
-
-        fitur_5 = extract_5_features(results.pose_landmarks, img_w, img_h)
-        if fitur_5 is None:
-            return {"status": "gagal", "pesan": "Titik bahu/telinga tidak jelas."}
-
-        # === TAMBAHAN BARU: Menangkap koordinat (x,y) untuk Frontend ===
-        lm = results.pose_landmarks.landmark
-        titik_tubuh = {
-            "nose": {"x": lm[0].x, "y": lm[0].y},
-            "left_ear": {"x": lm[7].x, "y": lm[7].y},
-            "right_ear": {"x": lm[8].x, "y": lm[8].y},
-            "left_shoulder": {"x": lm[11].x, "y": lm[11].y},
-            "right_shoulder": {"x": lm[12].x, "y": lm[12].y}
-        }
-
-        df_16 = build_16_features(fitur_5)
-        X_imputed = imputer_step.transform(df_16)
-        X_scaled = scaler_step.transform(X_imputed)
-
-        prob_buruk = float(clf_step.predict_proba(X_scaled)[0][1])
-        
-        # GANTI CUSTOM_THRESHOLD DENGAN ANGKA MANUAL YANG LEBIH SENSITIF
-        # Semakin kecil angkanya (misal 0.15 atau 0.2), semakin mudah AI menganggap Anda bungkuk!
-        SENSITIVITAS = 0.60 
-        
-        angka_hasil = 1 if prob_buruk >= SENSITIVITAS else 0
-        postur_akhir = "Duduk Benar / Tegak" if angka_hasil == 0 else "Duduk Salah / Bungkuk"
-
-        return {
-            "status": "sukses",
-            "email": current_user,
-            "hasil": {
-                "target_prediksi": angka_hasil,
-                "analisis_AI": postur_akhir,
-                "probabilitas": round(prob_buruk, 4),
-                "titik_tubuh": titik_tubuh # Data ini yang akan dibaca oleh pose.js
-            }
-        }
+        return await run_in_threadpool(_run_posture_inference, contents, current_user)
+    except HTTPException:
+        raise
     except Exception as e:
         traceback.print_exc()
         return {"status": "error", "pesan": str(e)}

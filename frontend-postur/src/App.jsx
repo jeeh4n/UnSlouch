@@ -50,6 +50,7 @@ function Shell({ user, token, onLogout }) {
   }, [location.pathname, navigate]);
 
   const [posture, setPosture] = useState(null);
+  const [landmarks, setLandmarks] = useState(null);
   const [alertHistory, setAlertHistory] = useState([]);
   const lastProbRef = useRef(0.9);
   
@@ -128,6 +129,7 @@ function Shell({ user, token, onLogout }) {
     if (!camera.on) {
       badSince.current = null;
       hasBeeped.current = false;
+      setLandmarks(null);
     }
   }, [camera.on]);
 
@@ -138,6 +140,7 @@ function Shell({ user, token, onLogout }) {
     
     if (!result || result.error) {
       setPosture(result?.error ? "error" : null);
+      setLandmarks(null);
       badSince.current = null;
       hasBeeped.current = false;
       return;
@@ -151,6 +154,7 @@ function Shell({ user, token, onLogout }) {
     
     const isBad = result.bad;
     setPosture(isBad ? "bad" : "good");
+    setLandmarks(result.landmarks || null);
     
     if (isBad) {
       if (!badSince.current) {
@@ -201,7 +205,7 @@ function Shell({ user, token, onLogout }) {
         )}
         
         <div style={{ display: page === "Live Monitoring" ? "block" : "none" }}>
-          <Monitoring camera={camera} settings={settings} posture={shownPosture} stretchAlert={stretchOpen} />
+          <Monitoring camera={camera} settings={settings} posture={shownPosture} landmarks={camera.on ? landmarks : null} stretchAlert={stretchOpen} />
         </div>
         
         {page === "History" && (

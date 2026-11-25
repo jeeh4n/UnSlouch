@@ -162,6 +162,8 @@ export default function CameraStage({ camera, posture, title, hint, dwell = 7, l
         pipVideo.play().catch(() => {});
       }
 
+      let pipInitialized = false;
+
       const drawLoop = () => {
         if (video.videoWidth > 0) {
           const vw = video.videoWidth;
@@ -169,8 +171,10 @@ export default function CameraStage({ camera, posture, title, hint, dwell = 7, l
           const overlay = overlayCanvasRef.current;
 
           if (overlay) {
-            overlay.width = vw;
-            overlay.height = vh;
+            if (overlay.width !== vw || overlay.height !== vh) {
+              overlay.width = vw;
+              overlay.height = vh;
+            }
             const ctx = overlay.getContext("2d");
             ctx.clearRect(0, 0, vw, vh);
 
@@ -249,52 +253,65 @@ export default function CameraStage({ camera, posture, title, hint, dwell = 7, l
               badgeRef.current.innerText = text;
             }
 
-            // // ========================================================
-            // // LAPISAN 2: MENGGAMBAR TITIK (Paling Atas)
-            // // ========================================================
-            // const currentLandmarks = landmarksRef.current;
-            // if (currentLandmarks && currentLandmarks.nose) {
-            //   ctx.save();
-            //   ctx.fillStyle = "#00efff"; 
-            //   ctx.strokeStyle = "#ffffff";
-            //   ctx.lineWidth = 2;
+            // ========================================================
+            // LAPISAN 2: MENGGAMBAR TITIK (Paling Atas)
+            // ========================================================
+            const currentLandmarks = landmarksRef.current;
+            if (currentLandmarks && currentLandmarks.nose) {
+              ctx.save();
+              ctx.fillStyle = "#00efff";
+              ctx.strokeStyle = "#ffffff";
+              ctx.lineWidth = 2;
 
-            //   const drawPoint = (landmark) => {
-            //     if (!landmark) return;
-            //     // KITA HAPUS PEMBALIKAN (vw - x), karena videonya sudah dicerminkan
-            //     const px = landmark.x * vw;
-            //     const py = landmark.y * vh;
-            //     ctx.beginPath();
-            //     ctx.arc(px, py, 7, 0, 2 * Math.PI); 
-            //     ctx.fill();
-            //     ctx.stroke();
-            //   };
+              const drawPoint = (landmark) => {
+                if (!landmark) return;
+                const px = landmark.x * vw;
+                const py = landmark.y * vh;
+                ctx.beginPath();
+                ctx.arc(px, py, 7, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+              };
 
-            //   drawPoint(currentLandmarks.nose);
-            //   drawPoint(currentLandmarks.left_ear);
-            //   drawPoint(currentLandmarks.right_ear);
-            //   drawPoint(currentLandmarks.left_shoulder);
-            //   drawPoint(currentLandmarks.right_shoulder);
-              
-            //   if (currentLandmarks.left_shoulder && currentLandmarks.right_shoulder) {
-            //     const ls = currentLandmarks.left_shoulder;
-            //     const rs = currentLandmarks.right_shoulder;
-            //     ctx.beginPath();
-            //     ctx.moveTo(ls.x * vw, ls.y * vh);
-            //     ctx.lineTo(rs.x * vw, rs.y * vh);
-            //     ctx.strokeStyle = "rgba(0, 239, 255, 0.7)"; 
-            //     ctx.lineWidth = 3;
-            //     ctx.stroke();
-            //   }
-            //   ctx.restore();
-            // }
+              drawPoint(currentLandmarks.nose);
+              drawPoint(currentLandmarks.left_ear);
+              drawPoint(currentLandmarks.right_ear);
+              drawPoint(currentLandmarks.left_shoulder);
+              drawPoint(currentLandmarks.right_shoulder);
+
+              if (currentLandmarks.left_shoulder && currentLandmarks.right_shoulder) {
+                const ls = currentLandmarks.left_shoulder;
+                const rs = currentLandmarks.right_shoulder;
+                ctx.beginPath();
+                ctx.moveTo(ls.x * vw, ls.y * vh);
+                ctx.lineTo(rs.x * vw, rs.y * vh);
+                ctx.strokeStyle = "rgba(0, 239, 255, 0.7)";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+              }
+
+              if (currentLandmarks.left_ear && currentLandmarks.right_ear) {
+                const le = currentLandmarks.left_ear;
+                const re = currentLandmarks.right_ear;
+                ctx.beginPath();
+                ctx.moveTo(le.x * vw, le.y * vh);
+                ctx.lineTo(re.x * vw, re.y * vh);
+                ctx.strokeStyle = "rgba(34, 197, 94, 0.8)";
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+              }
+              ctx.restore();
+            }
 
             // ========================================================
-            // LAPISAN 3: GABUNGKAN KE POP-UP PiP
+            // LAPISAN 3: GABUNGKAN KE POP-UP PiP (hanya saat PiP aktif / inisialisasi awal)
             // ========================================================
-            if (pipCanvas) {
-              pipCanvas.width = vw;
-              pipCanvas.height = vh;
+            const pipActive = document.pictureInPictureElement === pipVideoRef.current;
+            if (pipCanvas && (!pipInitialized || pipActive)) {
+              if (pipCanvas.width !== vw || pipCanvas.height !== vh) {
+                pipCanvas.width = vw;
+                pipCanvas.height = vh;
+              }
               const pipCtx = pipCanvas.getContext("2d");
 
               // 1. Gambar video mentah, TAPI KITA MIRROR SECARA MANUAL
@@ -313,6 +330,7 @@ export default function CameraStage({ camera, posture, title, hint, dwell = 7, l
                 formatTime(elapsedRef.current || 0),
                 stretchRef.current ? Date.now() - stretchSinceRef.current : null
               );
+              pipInitialized = true;
             }
           }
         }
